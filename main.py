@@ -6,7 +6,7 @@ import matplotlib; matplotlib.use("TkAgg")
 import matplotlib.animation as animation
 import os
 import re
-
+import netCDF4
 
 M = 0.098
 D = 0.18
@@ -29,11 +29,14 @@ class CellularAutomata:
         center_y = round(self.dimension[1]/2)
         self.grid[center_x-5:center_x+5, center_y-5:center_y+5] = n_oil_mass
 
-    def run(self, duration_hours, step_minutes):
+    def run(self, duration_hours, step_minutes, current):
         n_steps = round(duration_hours*60//step_minutes)
         print("Simulation will take {} steps".format(n_steps))
         for t in range(n_steps):
-            self.grid = update_function.update_grid(self.grid, np.zeros(self.dimension), M, D)
+            velocity_grid = current.get_east_velocity_grid(t)
+            north_velocity_grid = current.get_north_velocity_grid(t)
+            self.grid = update_function.update_grid(self.grid, np.zeros(self.dimension), M, D, velocity_grid,
+                                                    np.amax(velocity_grid)), north_velocity_grid, np.amax(north_velocity_grid)
             self.save_grid_to_file(t)
             print(t)
         self.animation()
@@ -65,8 +68,55 @@ class CellularAutomata:
         plt.show()
 
 
+class Currents:
+    def __init__(self):
+        fp = 'currents.nc'
+        self.data = netCDF4.Dataset(fp)
+        self.velocityEast = self.data['u']  # (time, depth, lat, long)
+        self.velocityNorth = self.data['v'] # (time, depth, lat, long)
+        self.time = self.data['time']
+        self.lat = self.data['latitude']
+        self.lon = self.data['longitude']
+
+    def get_east_velocity_grid(self, time):
+        if time <= 10 :
+            v = -self.velocityEast[0, 0, :, :]
+        if 10 < time <= 20:
+            v = -self.velocityEast[1, 0, :, :]
+        if 20 < time <= 30:
+            v = -self.velocityEast[2, 0, :, :]
+        if 30 < time <= 40:
+            v = -self.velocityEast[3, 0, :, :]
+        if 40 < time <= 50:
+            v = -self.velocityEast[5, 0, :, :]
+        if 50 < time:
+            v = -self.velocityEast[6, 0, :, :]
+        if time > 60:
+            v = np.zeros(221, 181)
+        return v
+
+    def get_north_velocity_grid(self, time):
+        if time <= 10 :
+            v = -self.velocityNorth[0, 0, :, :]
+        if 10 < time <= 20:
+            v = -self.velocityNorth[1, 0, :, :]
+        if 20 < time <= 30:
+            v = -self.velocityNorth[2, 0, :, :]
+        if 30 < time <= 40:
+            v = -self.velocityNorth[3, 0, :, :]
+        if 40 < time <= 50:
+            v = -self.velocityNorth[5, 0, :, :]
+        if 50 < time:
+            v = -self.velocityNorth[6, 0, :, :]
+        if time > 60:
+            v = np.zeros(221, 181)
+        return v
+
+
 if __name__ == "__main__":
+    current = Currents()
     ca = CellularAutomata((N_HEIGHT, N_WIDTH))
     ca.initialize_states(INITIAL_OIL_MASS)
-    ca.run(DURATION, TIMESTEP)
+    ca.run(DURATION, TIMESTEP, current)
+
 
