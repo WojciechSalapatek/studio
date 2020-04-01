@@ -8,14 +8,13 @@ import os
 import re
 import netCDF4
 
-M = 0.098
+M = 0.058
 D = 0.18
-DURATION = 5*24
-N_HEIGHT = 221
-N_WIDTH = 181
-TIMESTEP = 60
-INITIAL_OIL_MASS = 5000
-
+DURATION = 24*5
+N_HEIGHT = 181 #long
+N_WIDTH = 221 #lat
+TIMESTEP = round(300/60)
+INITIAL_OIL_MASS = 50000
 
 
 class CellularAutomata:
@@ -27,7 +26,7 @@ class CellularAutomata:
     def initialize_states(self, n_oil_mass):
         center_x = round(self.dimension[0]/2)
         center_y = round(self.dimension[1]/2)
-        self.grid[center_x-5:center_x+5, center_y-5:center_y+5] = n_oil_mass
+        self.grid[center_x, center_y] = n_oil_mass
 
     def run(self, duration_hours, step_minutes, current):
         n_steps = round(duration_hours*60//step_minutes)
@@ -35,8 +34,11 @@ class CellularAutomata:
         for t in range(n_steps):
             velocity_grid = current.get_east_velocity_grid(t)
             north_velocity_grid = current.get_north_velocity_grid(t)
-            self.grid = update_function.update_grid(self.grid, np.zeros(self.dimension), M, D, velocity_grid,
-                                                    np.amax(velocity_grid)), north_velocity_grid, np.amax(north_velocity_grid)
+            a = north_velocity_grid[16, 213]
+            velocity_grid[velocity_grid == a] = 0
+            north_velocity_grid[north_velocity_grid == a] = 0
+            self.grid = update_function.update_grid(self.grid, np.zeros(self.dimension), M, D, np.array(velocity_grid),
+                                                    np.amax(velocity_grid), np.array(north_velocity_grid), np.amax(north_velocity_grid))
             self.save_grid_to_file(t)
             print(t)
         self.animation()
@@ -63,8 +65,11 @@ class CellularAutomata:
         for image in files:
             im = plt.imshow(Image.open(self.out_dir + image), animated=True)
             ims.append([im])
-        ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True,
+        ani = animation.ArtistAnimation(fig, ims, interval=7, blit=True,
                                         repeat_delay=100)
+        # Writer = animation.writers['ffmpeg']
+        # writer = Writer(fps=30, metadata=dict(artist='Me'), bitrate=1800)  # Uncomment to save .mp4 animation
+        # ani.save('anim4.mp4', writer=writer)
         plt.show()
 
 
@@ -79,37 +84,37 @@ class Currents:
         self.lon = self.data['longitude']
 
     def get_east_velocity_grid(self, time):
-        if time <= 10 :
+        day = round((TIMESTEP*time)/(60*24))
+        if day <= 1 :
             v = -self.velocityEast[0, 0, :, :]
-        if 10 < time <= 20:
+        elif 1 < day <= 2:
             v = -self.velocityEast[1, 0, :, :]
-        if 20 < time <= 30:
+        elif 2 < day <= 3:
             v = -self.velocityEast[2, 0, :, :]
-        if 30 < time <= 40:
+        elif 3 < day <= 4:
             v = -self.velocityEast[3, 0, :, :]
-        if 40 < time <= 50:
+        elif 4 < day <= 5:
             v = -self.velocityEast[5, 0, :, :]
-        if 50 < time:
+        elif 5 < day:
             v = -self.velocityEast[6, 0, :, :]
-        if time > 60:
-            v = np.zeros(221, 181)
+        else :
+            v = np.zeros((181, 221))
         return v
 
     def get_north_velocity_grid(self, time):
-        if time <= 10 :
+        day = round((TIMESTEP * time) / (60 * 24))
+        if day <= 1 :
             v = -self.velocityNorth[0, 0, :, :]
-        if 10 < time <= 20:
+        elif 1 < day <= 2:
             v = -self.velocityNorth[1, 0, :, :]
-        if 20 < time <= 30:
+        elif 2 < day <= 3:
             v = -self.velocityNorth[2, 0, :, :]
-        if 30 < time <= 40:
+        elif 3 < day <= 4:
             v = -self.velocityNorth[3, 0, :, :]
-        if 40 < time <= 50:
+        elif 4 < day <= 5:
             v = -self.velocityNorth[5, 0, :, :]
-        if 50 < time:
+        elif 5 < day:
             v = -self.velocityNorth[6, 0, :, :]
-        if time > 60:
-            v = np.zeros(221, 181)
         return v
 
 
@@ -118,5 +123,4 @@ if __name__ == "__main__":
     ca = CellularAutomata((N_HEIGHT, N_WIDTH))
     ca.initialize_states(INITIAL_OIL_MASS)
     ca.run(DURATION, TIMESTEP, current)
-
 
