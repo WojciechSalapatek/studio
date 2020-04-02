@@ -1,0 +1,13 @@
+.idea
+.idea/*
+
+*.c
+*.mp4
+
+*.so
+
+build
+build/*
+
+out
+out/*
