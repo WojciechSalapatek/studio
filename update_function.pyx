@@ -1,6 +1,7 @@
 #cython.wraparound=False
 #cython.boundscheck=False
 cimport numpy as np
+from libc.math cimport sqrt
 
 def update_grid(np.ndarray[np.float64_t, ndim=2] input_grid, np.ndarray[np.float64_t, ndim=2] output_grid,
                 double m, double d, np.ndarray[np.float64_t, ndim=2] west_currents_grid, np.float64_t west_max_current,
@@ -10,7 +11,7 @@ def update_grid(np.ndarray[np.float64_t, ndim=2] input_grid, np.ndarray[np.float
         size_t j
         np.float64_t w
         np.float64_t n
-        np.gloat64_t wn
+        np.float64_t wn
 
     for i in range(1, input_grid.shape[0]-1):
         for j in range(1, input_grid.shape[1]-1):

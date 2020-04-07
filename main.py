@@ -11,8 +11,8 @@ import netCDF4
 M = 0.058
 D = 0.18
 DURATION = 24*5
-N_HEIGHT = 181 #long
-N_WIDTH = 221 #lat
+N_HEIGHT = 53  # lat
+N_WIDTH = 77  # long
 TIMESTEP = round(300/60)
 INITIAL_OIL_MASS = 50000
 
@@ -34,7 +34,7 @@ class CellularAutomata:
         for t in range(n_steps):
             velocity_grid = current.get_east_velocity_grid(t)
             north_velocity_grid = current.get_north_velocity_grid(t)
-            a = north_velocity_grid[16, 213]
+            a = north_velocity_grid[0, 0]
             velocity_grid[velocity_grid == a] = 0
             north_velocity_grid[north_velocity_grid == a] = 0
             self.grid = update_function.update_grid(self.grid, np.zeros(self.dimension), M, D, np.array(velocity_grid),
@@ -56,6 +56,7 @@ class CellularAutomata:
             m = key_pat.match(item)
             return int(m.group(1))
 
+        img = plt.imread("map_for_simulation.png")
         fig = plt.figure()
         files = []
         ims = []
@@ -72,16 +73,27 @@ class CellularAutomata:
         # ani.save('anim4.mp4', writer=writer)
         plt.show()
 
+# data for currents prep (lat 18: 31 long -101:-82
+# top-left corner of a map corresponds to: 31 lat, -101 long
+
 
 class Currents:
     def __init__(self):
         fp = 'currents.nc'
         self.data = netCDF4.Dataset(fp)
-        self.velocityEast = self.data['u']  # (time, depth, lat, long)
-        self.velocityNorth = self.data['v'] # (time, depth, lat, long)
+        # index corresponding to values lat 18: 31 -> indexes 72:125
+        # long -101:-82 -> indexes 16:93
+        # time: 5 days -> indexes 0:5
+
+        self.lat = self.data['latitude'][72:125]
+        self.lon = self.data['longitude'][16:93]
+        tmp = self.data['u'][0:5, :, 72:125, 16:93]
+
+        # flip is made to ensure that velocityEast[0][0] refers to the current int the top left corner of the map
+        self.velocityEast = np.flip(self.data['u'][0:5, :, 72:125, 16:93], 2)  # (time, depth, lat, long)
+        self.velocityNorth = np.flip(self.data['v'][0:5, :, 72:125, 16:93], 2)  # (time, depth, lat, long)
+
         self.time = self.data['time']
-        self.lat = self.data['latitude']
-        self.lon = self.data['longitude']
 
     def get_east_velocity_grid(self, time):
         day = round((TIMESTEP*time)/(60*24))
