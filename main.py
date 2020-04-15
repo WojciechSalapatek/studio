@@ -13,9 +13,8 @@ M = 0.098
 D = 0.18
 N_HEIGHT = 53*3  # lat
 N_WIDTH = 77*3  # long
-INITIAL_OIL_MASS = 50000
 
-DAYS = 5
+DAYS = 1
 DURATION = 24*DAYS         # hours
 TIMESTEP = round(300/60)   # minutes
 
@@ -99,22 +98,24 @@ class Currents:
     def get_east_velocity_grid(self, time):
         day = int(np.floor((TIMESTEP*time)/(60*24)))
         if day >= DAYS:
-            return np.zeros((N_HEIGHT, N_WIDTH))
+            return np.zeros((N_HEIGHT, N_WIDTH)) + 0.00001
         else:
             return -self.eastVelocities[day]
 
     def get_north_velocity_grid(self, time):
         day = int(np.floor((TIMESTEP * time) / (60 * 24)))
         if day >= DAYS:
-            return np.zeros((N_HEIGHT, N_WIDTH))
+            return np.zeros((N_HEIGHT, N_WIDTH)) + 0.00001
         else:
             return -self.northVelocities[day]
 
 
 if __name__ == "__main__":
-    frames_out_dir = "out/"
+    grids_out_dir = "out/grids/"
+    frame_images_out_dir = "out/frames/"
+    animation_file = "out/animations/anim12.mp4"
     current = Currents()
     leak_pos = calculate_leak_position((18, 31), (-101, -82), (N_HEIGHT, N_WIDTH))
-    ca = CellularAutomata((N_HEIGHT, N_WIDTH), frames_out_dir, LEAK_PER_STEP, leak_pos, clean_out=False)
+    ca = CellularAutomata((N_HEIGHT, N_WIDTH), grids_out_dir, LEAK_PER_STEP, leak_pos, clean_out=True)
     ca.run(DURATION, TIMESTEP, current)
-    # make_animation(frames_out_dir, "map_for_simulation.png", (N_WIDTH, N_HEIGHT), "animations/anim10.mp4")
+    # make_animation(grids_out_dir, frame_images_out_dir, "map_for_simulation.png", (N_WIDTH, N_HEIGHT), animation_file)
