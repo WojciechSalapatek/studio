@@ -1,90 +1,59 @@
 import numpy as np
 import update_function
-import matplotlib.pyplot as plt
-from PIL import Image
 import matplotlib; matplotlib.use("TkAgg")
-import matplotlib.animation as animation
-import os
-import re
+from animation import make_animation
+from calcuations import *
 import netCDF4
 from scipy.ndimage import interpolation
 
-M = 0.058
+M = 0.098
 D = 0.18
 N_HEIGHT = 53*3  # lat
-N_WIDTH = 77*3 # long
+N_WIDTH = 77*3  # long
 INITIAL_OIL_MASS = 50000
 
 DAYS = 1
-DURATION = 24*DAYS
-TIMESTEP = round(300/60)
+DURATION = 24*DAYS         # hours
+TIMESTEP = round(300/60)   # minutes
+
+LEAK_PER_DAY = 1500000                          # of kilograms per day
+LEAK_PER_STEP = TIMESTEP*LEAK_PER_DAY/(24*60)   # of kilograms per step
 
 
 class CellularAutomata:
-    def __init__(self, dimension):
+    def __init__(self, dimension, out_dir, leak_rate_per_step, leak_location):
         self.dimension = dimension
         self.grid = np.zeros(dimension)
-        self.out_dir = "out/"
+        self.leak_rate_per_step = leak_rate_per_step
+        self.leak_location_i = leak_location[0]
+        self.leak_location_j = leak_location[1]
+        self.out_dir = out_dir
 
-    def initialize_states(self, n_oil_mass):
-        self.grid[20, 150] = n_oil_mass
-
-    def run(self, duration_hours, step_minutes, current, make_animation=False):
+    def run(self, duration_hours, step_minutes, current):
         n_steps = round(duration_hours*60//step_minutes)
+
         print("Simulation parameters:")
-        print(" Grid size {}x{}".format(N_HEIGHT, N_WIDTH))
-        print(" Duration: {} days".format(DAYS))
-        print(" Timestep: {} minutes".format(TIMESTEP))
-        print(" Simulation will take {} steps".format(n_steps))
+        print(f" Grid size {self.dimension[0]}x{self.dimension[1]}")
+        print(f" Duration: {duration_hours} hours")
+        print(f" Timestep: {step_minutes} minutes")
+        print(f" Leak: {self.leak_rate_per_step} kilograms per step at [{self.leak_location_i}, {self.leak_location_j}]")
+        print(f" Simulation will take {n_steps} steps")
+
         for t in range(1, n_steps+1):
             velocity_grid = current.get_east_velocity_grid(t)
             north_velocity_grid = current.get_north_velocity_grid(t)
+            self.grid[self.leak_location_i, self.leak_location_j] += self.leak_rate_per_step
             self.grid = update_function.update_grid(self.grid, np.zeros(self.dimension), M, D, np.array(velocity_grid),
                                                     np.amax(velocity_grid), np.array(north_velocity_grid), np.amax(north_velocity_grid))
             self.save_grid_to_file(t)
             print(t)
-        if make_animation:
-            self.animation()
 
     def save_grid_to_file(self, t):
-        data = self.grid
-        rescaled = (255.0 / data.max() * (data - data.min()))
-        black = np.zeros((N_HEIGHT, N_WIDTH, 4))
-        black[:, :, 3] = rescaled
-        im = Image.fromarray(black.astype(np.uint8))
-        im.save(self.out_dir + 'frame{}.png'.format(t))
+        np.savetxt(self.out_dir + 'frame{}.txt'.format(t), self.grid)
 
-    def animation(self):
-        key_pat = re.compile(r"^frame(.*).png$")
-
-        def key(item):
-            m = key_pat.match(item)
-            return int(m.group(1))
-
-        img = Image.open("map_for_simulation.png")
-        img = img.resize((N_WIDTH, N_HEIGHT))
-        fig = plt.figure()
-        files = []
-        ims = []
-        for file in os.listdir(self.out_dir):
-            files.append(file)
-        files.sort(key=key)
-        for image in files:
-            frame = Image.open(self.out_dir + image)
-            comp = Image.alpha_composite(img, frame.convert('RGBA'))
-            im = plt.imshow(comp, animated=True)
-            ims.append([im])
-        ani = animation.ArtistAnimation(fig, ims, interval=7, blit=True,
-                                        repeat_delay=100)
-        Writer = animation.writers['ffmpeg']
-        writer = Writer(fps=30, metadata=dict(artist='Me'), bitrate=1800)  # Uncomment to save .mp4 animation
-        ani.save('anim9.mp4', writer=writer)
-        plt.show()
 
 # data for currents prep (lat 18: 31 long -101:-82
 # top-left corner of a map corresponds to: 31 lat, -101 long
-
-
 class Currents:
     def __init__(self):
         fp = 'currents.nc'
@@ -133,8 +102,9 @@ class Currents:
 
 
 if __name__ == "__main__":
+    frames_out_dir = "out/"
     current = Currents()
-    ca = CellularAutomata((N_HEIGHT, N_WIDTH))
-    ca.initialize_states(INITIAL_OIL_MASS)
-    ca.run(DURATION, TIMESTEP, current, make_animation=False)
-
+    leak_pos = calculate_leak_position((18, 31), (-101, -82), (N_HEIGHT, N_WIDTH))
+    ca = CellularAutomata((N_HEIGHT, N_WIDTH), frames_out_dir, LEAK_PER_STEP, leak_pos)
+    ca.run(DURATION, TIMESTEP, current)
+    # make_animation(frames_out_dir, "map_for_simulation.png", (N_WIDTH, N_HEIGHT), "animations/anim10.mp4")
