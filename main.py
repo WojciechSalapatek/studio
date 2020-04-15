@@ -3,8 +3,11 @@ import update_function
 import matplotlib; matplotlib.use("TkAgg")
 from animation import make_animation
 from calcuations import *
+import time
 import netCDF4
 from scipy.ndimage import interpolation
+import shutil
+import os
 
 M = 0.098
 D = 0.18
@@ -12,7 +15,7 @@ N_HEIGHT = 53*3  # lat
 N_WIDTH = 77*3  # long
 INITIAL_OIL_MASS = 50000
 
-DAYS = 1
+DAYS = 5
 DURATION = 24*DAYS         # hours
 TIMESTEP = round(300/60)   # minutes
 
@@ -21,13 +24,17 @@ LEAK_PER_STEP = TIMESTEP*LEAK_PER_DAY/(24*60)   # of kilograms per step
 
 
 class CellularAutomata:
-    def __init__(self, dimension, out_dir, leak_rate_per_step, leak_location):
+    def __init__(self, dimension, out_dir, leak_rate_per_step, leak_location, clean_out=False):
         self.dimension = dimension
         self.grid = np.zeros(dimension)
         self.leak_rate_per_step = leak_rate_per_step
         self.leak_location_i = leak_location[0]
         self.leak_location_j = leak_location[1]
         self.out_dir = out_dir
+        if clean_out:
+            print(f"Cleaning output directory {out_dir}")
+            shutil.rmtree(self.out_dir, onerror=None)
+            os.makedirs(self.out_dir)
 
     def run(self, duration_hours, step_minutes, current):
         n_steps = round(duration_hours*60//step_minutes)
@@ -40,13 +47,16 @@ class CellularAutomata:
         print(f" Simulation will take {n_steps} steps")
 
         for t in range(1, n_steps+1):
+            ts = time.time()
             velocity_grid = current.get_east_velocity_grid(t)
             north_velocity_grid = current.get_north_velocity_grid(t)
             self.grid[self.leak_location_i, self.leak_location_j] += self.leak_rate_per_step
             self.grid = update_function.update_grid(self.grid, np.zeros(self.dimension), M, D, np.array(velocity_grid),
                                                     np.amax(velocity_grid), np.array(north_velocity_grid), np.amax(north_velocity_grid))
             self.save_grid_to_file(t)
-            print(t)
+            tm = (time.time() - ts)
+
+            print(f"Step {t} performed, realization time {int(tm*1000)} ms, estimated {(n_steps-t)*tm} seconds")
 
     def save_grid_to_file(self, t):
         np.savetxt(self.out_dir + 'frame{}.txt'.format(t), self.grid)
@@ -64,11 +74,11 @@ class Currents:
 
         self.lat = self.data['latitude'][72:125]
         self.lon = self.data['longitude'][16:93]
-        tmp = self.data['u'][0:5, :, 72:125, 16:93]
+        tmp = self.data['u'][0:DAYS, :, 72:125, 16:93]
 
         # flip is made to ensure that velocityEast[0][0] refers to the current int the top left corner of the map
-        self.velocityEast = np.flip(self.data['u'][0:5, :, 72:125, 16:93], 2)  # (time, depth, lat, long)
-        self.velocityNorth = np.flip(self.data['v'][0:5, :, 72:125, 16:93], 2)  # (time, depth, lat, long)
+        self.velocityEast = np.flip(self.data['u'][0:DAYS, :, 72:125, 16:93], 2)  # (time, depth, lat, long)
+        self.velocityNorth = np.flip(self.data['v'][0:DAYS, :, 72:125, 16:93], 2)  # (time, depth, lat, long)
 
         print("scaling currents")
         self.eastVelocities = self.filter_and_scale(self.velocityEast)
@@ -105,6 +115,6 @@ if __name__ == "__main__":
     frames_out_dir = "out/"
     current = Currents()
     leak_pos = calculate_leak_position((18, 31), (-101, -82), (N_HEIGHT, N_WIDTH))
-    ca = CellularAutomata((N_HEIGHT, N_WIDTH), frames_out_dir, LEAK_PER_STEP, leak_pos)
+    ca = CellularAutomata((N_HEIGHT, N_WIDTH), frames_out_dir, LEAK_PER_STEP, leak_pos, clean_out=False)
     ca.run(DURATION, TIMESTEP, current)
     # make_animation(frames_out_dir, "map_for_simulation.png", (N_WIDTH, N_HEIGHT), "animations/anim10.mp4")
