@@ -1,7 +1,7 @@
 import numpy as np
 import update_function
 import matplotlib; matplotlib.use("TkAgg")
-from animation import make_animation
+from animation import make_animation, get_land_map
 from calcuations import *
 import time
 import netCDF4
@@ -26,20 +26,21 @@ LEAK_PER_STEP = TIMESTEP*LEAK_PER_DAY/(24*60)   # of kilograms per step
 HORIZON_LAT = 28.755372
 HORIZON_LONG = -88.387681
 
-LATITUDE_RANGE = (round_degrees(HORIZON_LAT-0.5), round_degrees(HORIZON_LAT+0.5))       # must be rounded to 0.25
-LONGITUDE_RANGE = (round_degrees(HORIZON_LONG-0.25), round_degrees(HORIZON_LONG+0.75))    # must be rounded to 0.25
+LATITUDE_RANGE = (round_degrees(28.25), round_degrees(30.0))       # must be rounded to 0.25
+LONGITUDE_RANGE = (round_degrees(-89.5), round_degrees(-87))    # must be rounded to 0.25
 
 # Calculate grid size so that cell size has appropriate length
-N_HEIGHT, N_WIDTH = calculate_grid_dimension_with_cell_size(LATITUDE_RANGE, LONGITUDE_RANGE, 50)
+N_HEIGHT, N_WIDTH = calculate_grid_dimension_with_cell_size(LATITUDE_RANGE, LONGITUDE_RANGE, 1000)
 
 
 class CellularAutomata:
-    def __init__(self, dimension, out_dir, leak_rate_per_step, leak_location, clean_out=False):
+    def __init__(self, dimension, out_dir, leak_rate_per_step, leak_location, land_mask, clean_out=False):
         self.dimension = dimension
         self.grid = np.zeros(dimension)
         self.leak_rate_per_step = leak_rate_per_step
         self.leak_location_i = leak_location[0]
         self.leak_location_j = leak_location[1]
+        self.land_mask = land_mask
         self.out_dir = out_dir
         if clean_out:
             print(f"Cleaning output directory {out_dir}")
@@ -66,13 +67,15 @@ class CellularAutomata:
             self.grid[self.leak_location_i, self.leak_location_j] += self.leak_rate_per_step
             self.grid = update_function.update_grid(self.grid, np.zeros(self.dimension), M, D,
                                                     np.array(velocity_grid), np.array(north_velocity_grid))
+            self.grid[self.land_mask] = 0
             self.save_grid_to_file(t)
             tm = (time.time() - ts)
 
             print(f"Step {t} performed, realization time {int(tm*1000)} ms, estimated {(n_steps-t)*tm} seconds")
 
     def save_grid_to_file(self, t):
-        np.savetxt(self.out_dir + 'frame{}.txt'.format(t), self.grid)
+        data = self.grid.astype(int)
+        np.savetxt(self.out_dir + 'frame{}.txt'.format(t), data, fmt='%i')
 
 
 # data for currents prep (lat 18: 31 long -101:-82
@@ -102,6 +105,8 @@ class Currents:
         self.velocityEast = np.flip(self.data['u'][0:DAYS, :, start_lat_index:end_lat_index, start_lon_index:end_lon_index], 2)  # (time, depth, lat, long)
         self.velocityNorth = np.flip(self.data['v'][0:DAYS, :, start_lat_index:end_lat_index, start_lon_index:end_lon_index], 2)  # (time, depth, lat, long)
 
+        self.masked_el = self.data['u'][0, 0, 18, -101]
+
         print("Scaling currents")
         self.eastVelocities = self.filter_and_scale_and_normalise(self.velocityEast)
         self.northVelocities = self.filter_and_scale_and_normalise(self.velocityNorth)
@@ -109,12 +114,11 @@ class Currents:
         self.time = self.data['time']
 
     def filter_and_scale_and_normalise(self, arr_to_preprocess, output_arr=None):         # Filter Nan values and scale to grid size
-        masked = self.data['u'][0, 0, 18, -101]
         if output_arr is None:
             output_arr = []
         for i in range(DAYS):
             curr = arr_to_preprocess[i, 0, :, :]
-            curr[curr == masked] = 0.0000001
+            curr[curr == self.masked_el] = 0.0000001
             curr[np.isnan(curr)] = 0.0000001
             curr = interpolation.zoom(curr, (N_HEIGHT / curr.shape[0], N_WIDTH / curr.shape[1]))
             curr[np.isnan(curr)] = 0.0000001
@@ -135,15 +139,17 @@ class Currents:
         if day >= DAYS:
             return np.zeros((N_HEIGHT, N_WIDTH)) + 0.00001
         else:
-            return -self.northVelocities[day]
+            return self.northVelocities[day]
 
 
 if __name__ == "__main__":
     grids_out_dir = "out/grids/"
-    frame_images_out_dir = "out/frames2/"
-    animation_file = "out/animations/big_anim2.mp4"
+    frame_images_out_dir = "out/frames/"
+    animation_file = "out/animations/anim_fin2.mp4"
+    background_img  = "map_for_simulation.png"
     current = Currents(LATITUDE_RANGE, LONGITUDE_RANGE)
     leak_pos = calculate_leak_position(LATITUDE_RANGE, LONGITUDE_RANGE, (N_HEIGHT, N_WIDTH))
-    ca = CellularAutomata((N_HEIGHT, N_WIDTH), grids_out_dir, LEAK_PER_STEP, leak_pos, clean_out=True)
+    land_map = get_land_map(background_img, LATITUDE_RANGE, LONGITUDE_RANGE, (N_WIDTH, N_HEIGHT))
+    ca = CellularAutomata((N_HEIGHT, N_WIDTH), grids_out_dir, LEAK_PER_STEP, leak_pos, land_map, clean_out=True)
     ca.run(DURATION, TIMESTEP, current)
-    make_animation(grids_out_dir, frame_images_out_dir, "map_for_simulation.png", LATITUDE_RANGE, LONGITUDE_RANGE, (N_WIDTH, N_HEIGHT), animation_file)
+    make_animation(grids_out_dir, frame_images_out_dir, background_img, LATITUDE_RANGE, LONGITUDE_RANGE, (N_WIDTH, N_HEIGHT), animation_file)

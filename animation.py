@@ -27,19 +27,27 @@ def scan_frames(input_frames_dir, max_frames=None):
     return files
 
 
+def get_land_map(map_image, latitude_range, longitude_range, shape):
+    img = prepare_background(map_image, latitude_range, longitude_range, shape)
+    img = img.resize(shape, Image.NEAREST)
+    img.load()
+    data = np.asarray(img, dtype="uint8")
+    blue_mask = data[:, :, 2] != 255
+    red_mask = data[:, :,  0] > 180
+    return np.flip(np.logical_and(blue_mask, red_mask), 0)
+
+
 def frames_to_images(files, shape, output_frames_dir):
-    np.seterr(all='raise')
     print("Transforming matrices to images")
     ctr = 0
     all_frames = len(files)
     image_files = []
     for file in files:
-        data = np.loadtxt(file, dtype=float)
+        data = np.loadtxt(file, dtype=int)
         # rescaled = 255.0 * np.tanh(data/2500)
-        data[data<0]=0
-        data[data>255] = 255
-        rescaled=data
-        rescaled = np.flip(rescaled, 0)
+        data[data < 0] = 0
+        data[data > 255] = 255
+        rescaled = np.flip(data, 0)
         black = np.zeros((shape[1], shape[0], 4))
         black[:, :, 3] = rescaled
         im = Image.fromarray(black.astype(np.uint8))
