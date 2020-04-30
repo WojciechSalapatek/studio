@@ -7,7 +7,8 @@ cimport cython
 @cython.wraparound(False)
 def update_grid(np.ndarray[np.float64_t, ndim=2] input_grid, np.ndarray[np.float64_t, ndim=2] output_grid,
                 double m, double d, np.ndarray[np.float64_t, ndim=2] west_currents_grid,
-                np.ndarray[np.float64_t, ndim=2] north_currents_grid):
+                np.ndarray[np.float64_t, ndim=2] north_currents_grid,
+                np.ndarray[np.uint8_t, ndim=2] land_mask):
     cdef:
         size_t i
         size_t j
@@ -28,6 +29,9 @@ def update_grid(np.ndarray[np.float64_t, ndim=2] input_grid, np.ndarray[np.float
             s = -north_currents_grid[i,j] - north_currents_grid[i-1,j]
             e = -west_currents_grid[i,j] - west_currents_grid[i+1,j]
             wn = sqrt(n*n + w*w)
+
+            if land_mask[i,j] and land_mask[i-1,j] and land_mask[i,j-1] and land_mask[i+1,j] and land_mask[i,j+1]:
+                continue
 
             output_grid[i,j] = \
                 input_grid[i,j] \

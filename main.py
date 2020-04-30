@@ -66,8 +66,7 @@ class CellularAutomata:
             north_velocity_grid = current.get_north_velocity_grid(t)
             self.grid[self.leak_location_i, self.leak_location_j] += self.leak_rate_per_step
             self.grid = update_function.update_grid(self.grid, np.zeros(self.dimension), M, D,
-                                                    np.array(velocity_grid), np.array(north_velocity_grid))
-            self.grid[self.land_mask] = 0
+                                                    np.array(velocity_grid), np.array(north_velocity_grid), self.land_mask)
             self.save_grid_to_file(t)
             tm = (time.time() - ts)
 
@@ -145,11 +144,11 @@ class Currents:
 if __name__ == "__main__":
     grids_out_dir = "out/grids/"
     frame_images_out_dir = "out/frames/"
-    animation_file = "out/animations/anim_fin2.mp4"
+    animation_file = "out/animations/anim_fin3.mp4"
     background_img  = "map_for_simulation.png"
     current = Currents(LATITUDE_RANGE, LONGITUDE_RANGE)
     leak_pos = calculate_leak_position(LATITUDE_RANGE, LONGITUDE_RANGE, (N_HEIGHT, N_WIDTH))
     land_map = get_land_map(background_img, LATITUDE_RANGE, LONGITUDE_RANGE, (N_WIDTH, N_HEIGHT))
     ca = CellularAutomata((N_HEIGHT, N_WIDTH), grids_out_dir, LEAK_PER_STEP, leak_pos, land_map, clean_out=True)
     ca.run(DURATION, TIMESTEP, current)
-    make_animation(grids_out_dir, frame_images_out_dir, background_img, LATITUDE_RANGE, LONGITUDE_RANGE, (N_WIDTH, N_HEIGHT), animation_file)
+    make_animation(grids_out_dir, frame_images_out_dir, background_img, LATITUDE_RANGE, LONGITUDE_RANGE, (N_WIDTH, N_HEIGHT), land_map, animation_file)

@@ -37,20 +37,23 @@ def get_land_map(map_image, latitude_range, longitude_range, shape):
     return np.flip(np.logical_and(blue_mask, red_mask), 0)
 
 
-def frames_to_images(files, shape, output_frames_dir):
+def frames_to_images(files, shape, output_frames_dir, land_map):
     print("Transforming matrices to images")
     ctr = 0
     all_frames = len(files)
     image_files = []
+    flipped_land_map = np.logical_not(np.flip(land_map, 0))
     for file in files:
         data = np.loadtxt(file, dtype=int)
-        # rescaled = 255.0 * np.tanh(data/2500)
         data[data < 0] = 0
         data[data > 255] = 255
         rescaled = np.flip(data, 0)
-        black = np.zeros((shape[1], shape[0], 4))
-        black[:, :, 3] = rescaled
-        im = Image.fromarray(black.astype(np.uint8))
+        red_data = np.ones((shape[1], shape[0]))*255
+        red_data[flipped_land_map] = 0
+        black_and_red = np.zeros((shape[1], shape[0], 4))
+        black_and_red[:, :, 0] = red_data
+        black_and_red[:, :, 3] = rescaled
+        im = Image.fromarray(black_and_red.astype(np.uint8))
         image_file = output_frames_dir + "frame{}.png".format(ctr)
         im.save(image_file)
         image_files.append(image_file)
@@ -85,7 +88,7 @@ def prepare_background(background, latitude_range, longitude_range, shape):
     return img
 
 
-def make_animation(input_frames_dir, output_frames_dir, background, latitude_range, longitude_range, shape, out_file, max_frames=None):
+def make_animation(input_frames_dir, output_frames_dir, background, latitude_range, longitude_range, shape, land_map, out_file, max_frames=None):
     print("Preparing animation")
 
     background_img = prepare_background(background, latitude_range, longitude_range, shape)
@@ -95,7 +98,7 @@ def make_animation(input_frames_dir, output_frames_dir, background, latitude_ran
     os.makedirs(output_frames_dir)
 
     frame_files = scan_frames(input_frames_dir, max_frames)
-    image_files = frames_to_images(frame_files, shape, output_frames_dir)
+    image_files = frames_to_images(frame_files, shape, output_frames_dir, land_map)
 
     fig = plt.figure()
     ims = []
