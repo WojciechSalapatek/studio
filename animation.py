@@ -88,6 +88,25 @@ def prepare_background(background, latitude_range, longitude_range, shape):
     return img
 
 
+def screens(input_frames_dir, output_frames_dir, background, latitude_range, longitude_range, shape, land_map, out_dir,
+            n_days):
+    frame_files = scan_frames(input_frames_dir, None)
+    background_img = prepare_background(background, latitude_range, longitude_range, shape)
+    checkpoints = days(n_days, len(frame_files))
+    files = [frame_files[c - 1] for c in checkpoints]
+    image_files = frames_to_images(files, shape, output_frames_dir, land_map)
+    d = 1
+    for image_file in image_files:
+        image = Image.open(image_file)
+        comp = Image.alpha_composite(background_img, image.convert('RGBA'))
+        comp.save("{}/a{}.png".format(out_dir, d), "png")
+        d += 1
+
+
+def days(n_days, n_images):
+    return [i * round(n_images / n_days) for i in range(1, n_days + 1)]
+
+
 def make_animation(input_frames_dir, output_frames_dir, background, latitude_range, longitude_range, shape, land_map, out_file, max_frames=None):
     print("Preparing animation")
 
