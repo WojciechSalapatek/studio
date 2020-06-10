@@ -9,30 +9,6 @@ from scipy.ndimage import interpolation
 import shutil
 import os
 
-# Transmission parameters
-M = 0.088
-D = 0.18
-
-# Duration Parameters
-DAYS = 10
-DURATION = 24*DAYS         # hours
-TIMESTEP = round(300/60)   # minutes
-
-# Leakage parameters
-LEAK_PER_DAY = 7659770                          # of kilograms per day
-LEAK_PER_STEP = TIMESTEP*LEAK_PER_DAY/(24*60)   # of kilograms per step
-
-# Position and size parameters
-HORIZON_LAT = 28.755372
-HORIZON_LONG = -88.387681
-
-LATITUDE_RANGE = (round_degrees(28.0), round_degrees(30.25))       # must be rounded to 0.25
-LONGITUDE_RANGE = (round_degrees(-89.75), round_degrees(-86.75))    # must be rounded to 0.25
-
-CELL_SIZE = 800
-# Calculate grid size so that cell size has appropriate length
-N_HEIGHT, N_WIDTH = calculate_grid_dimension_with_cell_size(LATITUDE_RANGE, LONGITUDE_RANGE, CELL_SIZE)
-
 
 class CellularAutomata:
     def __init__(self, dimension, out_dir, leak_rate_per_step, leak_location, land_mask, clean_out=False):
@@ -141,14 +117,51 @@ class Currents:
             return self.northVelocities[day]
 
 
+####################################################################################################################
+#                                       Parameters to set
+####################################################################################################################
+DAYS = 10                 # how many days simulate
+LEAK_PER_DAY = 7659770    # of kilograms per day
+
+# Position and size parameters
+HORIZON_LAT = 28.755372
+HORIZON_LONG = -88.387681
+
+LATITUDE_RANGE = (round_degrees(28.0), round_degrees(30.25))       # must be rounded to 0.25
+LONGITUDE_RANGE = (round_degrees(-89.75), round_degrees(-86.75))    # must be rounded to 0.25
+
+GRIDS_OUT_DIR = "out/grids/"
+FRAME_IMAGES_OUT_DIR = "out/frames/"
+ANIMATION_FILE = "out/animations/sim_animation.mp4"
+BACKGROUND_IMG = "map_for_simulation.png"
+
+
+####################################################################################################################
+#                            Other parameters which should not be changed
+####################################################################################################################
+
+# size of cell [m]
+CELL_SIZE = 800
+
+# Transmission parameters
+M = 0.088
+D = 0.18
+
+# Duration Parameters
+DURATION = 24*DAYS         # hours
+TIMESTEP = round(300/60)   # minutes
+
+# Leakage parameters
+LEAK_PER_STEP = TIMESTEP*LEAK_PER_DAY/(24*60)   # of kilograms per step
+
+# Calculate grid size so that cell size has appropriate length
+N_HEIGHT, N_WIDTH = calculate_grid_dimension_with_cell_size(LATITUDE_RANGE, LONGITUDE_RANGE, CELL_SIZE)
+
+
 if __name__ == "__main__":
-    grids_out_dir = "out/grids/"
-    frame_images_out_dir = "out/frames/"
-    animation_file = "out/animations/sim_animation.mp4"
-    background_img = "map_for_simulation.png"
-    current = Currents(LATITUDE_RANGE, LONGITUDE_RANGE)
-    leak_pos = calculate_leak_position(LATITUDE_RANGE, LONGITUDE_RANGE, (N_HEIGHT, N_WIDTH))
-    land_map = get_land_map(background_img, LATITUDE_RANGE, LONGITUDE_RANGE, (N_WIDTH, N_HEIGHT))
-    ca = CellularAutomata((N_HEIGHT, N_WIDTH), grids_out_dir, LEAK_PER_STEP, leak_pos, land_map, clean_out=True)
-    ca.run(DURATION, TIMESTEP, current)
-    make_animation(grids_out_dir, frame_images_out_dir, background_img, LATITUDE_RANGE, LONGITUDE_RANGE, (N_WIDTH, N_HEIGHT), land_map, animation_file)
+    # current = Currents(LATITUDE_RANGE, LONGITUDE_RANGE)
+    # leak_pos = calculate_leak_position(LATITUDE_RANGE, LONGITUDE_RANGE, (N_HEIGHT, N_WIDTH))
+    land_map = get_land_map(BACKGROUND_IMG, LATITUDE_RANGE, LONGITUDE_RANGE, (N_WIDTH, N_HEIGHT))
+    # ca = CellularAutomata((N_HEIGHT, N_WIDTH), GRIDS_OUT_DIR, LEAK_PER_STEP, leak_pos, land_map, clean_out=True)
+    # ca.run(DURATION, TIMESTEP, current)
+    make_animation(GRIDS_OUT_DIR, FRAME_IMAGES_OUT_DIR, BACKGROUND_IMG, LATITUDE_RANGE, LONGITUDE_RANGE, (N_WIDTH, N_HEIGHT), land_map, ANIMATION_FILE)
